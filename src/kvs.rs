@@ -26,23 +26,18 @@ impl KvStore {
         })
     }
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
-        // let mut file = File::open(&self.log).unwrap();
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&self.log)
-            .unwrap();
+        let mut file = OpenOptions::new().read(true).write(true).open(&self.log)?;
 
         let command = Command::Set {
             key: key.clone(),
             value: value.clone(),
         };
 
-        let append = serde_json::to_string(&command).unwrap();
+        let command_json = serde_json::to_string(&command)?;
 
-        println!("append, {}", append);
+        println!("command_json, {}", command_json);
 
-        file.write(append.as_bytes()).unwrap();
+        file.write(command_json.as_bytes())?;
 
         self.data.insert(key, value);
         Ok(())
