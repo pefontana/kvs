@@ -10,6 +10,8 @@ pub enum KvsError {
     Io(#[cause] io::Error),
     #[fail(display = "{}", _0)]
     Serde(#[cause] serde_json::Error),
+    #[fail(display = "{}, Key not found", 0)]
+    KeyNotFound(String),
 }
 
 impl From<io::Error> for KvsError {

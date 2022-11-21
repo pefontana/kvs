@@ -6,9 +6,10 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Command::Get { key: _ } => {
-            eprintln!("get unimplemented");
-            std::process::exit(1)
+        Command::Get { key } => {
+            let result = kvs.get(key.to_string())?;
+            println!("{}", result.unwrap());
+            Ok(())
         }
         Command::Set { key, value } => {
             println!("Command::Set");

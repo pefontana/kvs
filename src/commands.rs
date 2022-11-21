@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Parser)]
 #[command(version = env!("CARGO_PKG_VERSION"))]
@@ -9,7 +9,7 @@ pub struct Cli {
     pub command: Command,
 }
 
-#[derive(Subcommand, Serialize)]
+#[derive(Subcommand, Serialize, Deserialize)]
 pub enum Command {
     Get { key: String },
     Set { key: String, value: String },

@@ -3,7 +3,7 @@ use crate::errors::KvsError;
 use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
-    io::Write,
+    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
 };
 pub type Result<T> = std::result::Result<T, KvsError>;
@@ -43,8 +43,34 @@ impl KvStore {
         Ok(())
     }
     pub fn get(&self, key: String) -> Result<Option<String>> {
-        self.data.get(&key).cloned();
-        todo!()
+        let file = OpenOptions::new().read(true).open(&self.log)?;
+
+        let reader = BufReader::new(file);
+
+        let mut result: Option<String> = None;
+
+        for line in reader.lines() {
+            let command: Command = serde_json::from_str(&line?)?;
+
+            match command {
+                Command::Set { key: k, value: v } => {
+                    if key == k {
+                        result = Some(v);
+                    }
+                }
+                Command::Rm { key: k } => {
+                    if key == k {
+                        result = None;
+                    }
+                }
+                Command::Get { key: _key } => return Err(KvsError::Error),
+            };
+        }
+
+        if result.is_some() {
+            return Ok(result);
+        }
+        Err(KvsError::KeyNotFound(key))
     }
     pub fn remove(&mut self, key: String) -> Result<()> {
         self.data.remove(&key);
