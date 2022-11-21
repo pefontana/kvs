@@ -26,7 +26,7 @@ impl KvStore {
         })
     }
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
-        let mut file = OpenOptions::new().read(true).write(true).open(&self.log)?;
+        let mut file = OpenOptions::new().read(true).append(true).open(&self.log)?;
 
         let command = Command::Set {
             key: key.clone(),
