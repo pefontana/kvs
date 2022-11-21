@@ -1,4 +1,4 @@
-pub use kv::KvStore;
-pub use kv::Result;
+pub use kvs::KvStore;
+pub use kvs::Result;
 
-mod kv;
+mod kvs;
