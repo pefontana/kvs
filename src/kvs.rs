@@ -1,13 +1,9 @@
+use crate::errors::KvsError;
 use std::{collections::HashMap, path::Path};
+pub type Result<T> = std::result::Result<T, KvsError>;
 
 pub struct KvStore {
     data: HashMap<String, String>,
-}
-pub type Result<T> = std::result::Result<T, KvsError>;
-
-#[derive(Debug)]
-pub enum KvsError {
-    Error,
 }
 
 impl KvStore {
