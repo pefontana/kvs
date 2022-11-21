@@ -40,7 +40,7 @@ impl KvStore {
 
         let append = serde_json::to_string(&command).unwrap();
 
-        // println!("append, {}", append);
+        println!("append, {}", append);
 
         file.write(append.as_bytes()).unwrap();
 
