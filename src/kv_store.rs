@@ -16,7 +16,16 @@ pub struct KvStore {
 
 impl KvStore {
     pub fn open(path: &Path) -> Result<KvStore> {
-        todo!()
+        let kvs = KvStore {
+            data: HashMap::new(),
+            log: path.join(PathBuf::from("log")),
+        };
+
+        if !kvs.log.exists() {
+            OpenOptions::new().write(true).create(true).open(&kvs.log)?;
+        }
+
+        Ok(kvs)
     }
     pub fn new() -> Result<KvStore> {
         let kvs = KvStore {
@@ -37,7 +46,7 @@ impl KvStore {
 
         let command_json = serde_json::to_string(&command)?;
 
-        println!("command_json, {}", command_json);
+        // println!("command_json, {}", command_json);
 
         file.write_all(command_json.as_bytes())?;
         file.write_all(b"\n")?;
@@ -84,7 +93,7 @@ impl KvStore {
         if result.is_some() {
             return Ok(result);
         }
-        Err(KvsError::KeyNotFound(key))
+        Ok(None)
     }
     pub fn remove(&mut self, key: String) -> Result<()> {
         let file = OpenOptions::new().read(true).open(&self.log)?;
@@ -115,6 +124,7 @@ impl KvStore {
             self.write_to_log(&Command::Rm { key })?;
             return Ok(());
         }
+        println!("Key not found");
         Err(KvsError::KeyNotFound(key))
     }
 }

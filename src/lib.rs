@@ -1,7 +1,7 @@
 pub use commands::{Cli, Command};
-pub use kvs::KvStore;
-pub use kvs::Result;
+pub use kv_store::KvStore;
+pub use kv_store::Result;
 
 mod commands;
 mod errors;
-mod kvs;
+mod kv_store;
