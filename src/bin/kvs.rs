@@ -18,9 +18,6 @@ fn main() -> Result<()> {
             kvs.set(key.to_string(), value.to_string()).unwrap();
             Ok(())
         }
-        Command::Rm { key: _ } => {
-            eprintln!("Rm unimplemented");
-            std::process::exit(1)
-        }
+        Command::Rm { key } => kvs.remove(key.to_string()),
     }
 }
