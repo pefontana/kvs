@@ -96,6 +96,9 @@ impl KvStore {
             OpenOptions::new().write(true).create(true).open(&kvs.log)?;
         }
 
+        //TODO
+        // Add load fn to read existing log and compute self.index
+
         Ok(kvs)
     }
 
@@ -150,35 +153,17 @@ impl KvStore {
     }
 
     pub fn remove(&mut self, key: String) -> Result<()> {
-        let file = OpenOptions::new().read(true).open(&self.log)?;
-
-        let reader = BufReader::new(file);
-
-        let mut result: Option<String> = None;
-
-        for line in reader.lines() {
-            let command: Command = serde_json::from_str(&line?)?;
-
-            match command {
-                Command::Set { key: k, value: v } => {
-                    if key == k {
-                        result = Some(v);
-                    }
-                }
-                Command::Rm { key: k } => {
-                    if key == k {
-                        result = None;
-                    }
-                }
-                Command::Get { key: _key } => return Err(KvsError::Error),
-            };
+        if self.index.remove(&key).is_none() {
+            return Err(KvsError::KeyNotFound(key));
         }
 
-        if result.is_some() {
-            self.write_to_log(&Command::Rm { key })?;
-            return Ok(());
-        }
-        println!("Key not found");
-        Err(KvsError::KeyNotFound(key))
+        let command = Command::Rm { key: key.clone() };
+
+        let command_json = serde_json::to_string(&command)?;
+        let _len = self.buf_writer_with_pos.write(command_json.as_bytes())?;
+        let _x = self.buf_writer_with_pos.write(b"\n")?;
+        self.buf_writer_with_pos.flush()?;
+
+        Ok(())
     }
 }

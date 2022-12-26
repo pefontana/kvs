@@ -1,8 +1,10 @@
+use std::path::Path;
+
 use clap::Parser;
 use kvs::{Cli, Command, KvStore, Result};
 
 fn main() -> Result<()> {
-    let mut kvs = KvStore::new().unwrap();
+    let mut kvs = KvStore::open(Path::new(""))?;
     let cli = Cli::parse();
 
     match &cli.command {
