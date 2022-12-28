@@ -5,15 +5,14 @@ use crate::errors::KvsError;
 use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
-    io::{BufRead, BufReader, BufWriter, LineWriter, Read, Seek, SeekFrom, Write},
+    io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
 pub type Result<T> = std::result::Result<T, KvsError>;
 
 pub struct KvStore {
-    data: HashMap<String, String>,
     index: HashMap<String, CommandIndex>,
-    log: PathBuf,
+    _log: PathBuf,
     reader: BufReader<File>,
     buf_writer_with_pos: BufWriterWithPos<File>,
 }
@@ -56,22 +55,6 @@ impl<W: Write + Seek> BufWriterWithPos<W> {
         })
     }
 }
-// pub struct Reader<R: Read + Seek> {
-//     reader: BufReader<R>,
-//     start: i128,
-// }
-
-// impl<R: Read + Seek> Read for Reader<R> {
-//     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-//         self.read(buf)
-//     }
-// }
-
-// impl<R: Read + Seek> Seek for Reader<R> {
-//     fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
-//         self.reader.seek(pos)
-//     }
-// }
 
 impl KvStore {
     pub fn open(path: &Path) -> Result<KvStore> {
@@ -91,9 +74,8 @@ impl KvStore {
                 .open(&log)?,
         )?;
         let mut kvs = KvStore {
-            data: HashMap::new(),
             index: HashMap::new(),
-            log,
+            _log: log,
             reader: BufReader::new(file),
             buf_writer_with_pos,
         };
@@ -109,7 +91,7 @@ impl KvStore {
         while let Some(command) = stream.next() {
             let new_pos = stream.byte_offset() as u64;
             match command? {
-                Command::Set { key: k, value: v } => {
+                Command::Set { key: k, value: _v } => {
                     self.index.insert(
                         k,
                         CommandIndex {
@@ -128,25 +110,11 @@ impl KvStore {
         }
         Ok(())
     }
-    fn write_to_log(&mut self, command: &Command) -> Result<()> {
-        let file = OpenOptions::new().read(true).append(true).open(&self.log)?;
-        let mut file = LineWriter::new(file);
-
-        let command_json = serde_json::to_string(&command)?;
-
-        // println!("command_json, {}", command_json);
-
-        file.write(command_json.as_bytes())?;
-        file.write_all(b"\n")?;
-        file.flush()?;
-
-        Ok(())
-    }
 
     pub fn set(&mut self, key: String, value: String) -> Result<()> {
         let command = Command::Set {
             key: key.clone(),
-            value: value.clone(),
+            value,
         };
 
         let command_json = serde_json::to_string(&command)?;
