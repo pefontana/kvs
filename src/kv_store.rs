@@ -1,3 +1,5 @@
+use serde_json::Deserializer;
+
 use crate::commands::Command;
 use crate::errors::KvsError;
 use std::{
@@ -75,6 +77,10 @@ impl KvStore {
     pub fn open(path: &Path) -> Result<KvStore> {
         let log = path.join(PathBuf::from("log"));
 
+        if !log.exists() {
+            OpenOptions::new().write(true).create(true).open(&log)?;
+        }
+
         let file = OpenOptions::new().read(true).open(&log)?;
 
         let buf_writer_with_pos = BufWriterWithPos::new(
@@ -84,7 +90,7 @@ impl KvStore {
                 .append(true)
                 .open(&log)?,
         )?;
-        let kvs = KvStore {
+        let mut kvs = KvStore {
             data: HashMap::new(),
             index: HashMap::new(),
             log,
@@ -92,16 +98,36 @@ impl KvStore {
             buf_writer_with_pos,
         };
 
-        if !kvs.log.exists() {
-            OpenOptions::new().write(true).create(true).open(&kvs.log)?;
-        }
-
-        //TODO
-        // Add load fn to read existing log and compute self.index
+        kvs.load()?;
 
         Ok(kvs)
     }
+    pub fn load(&mut self) -> Result<()> {
+        let mut pos = self.reader.seek(SeekFrom::Start(0))?;
+        let mut stream = Deserializer::from_reader(self.reader.get_ref()).into_iter::<Command>();
 
+        while let Some(command) = stream.next() {
+            let new_pos = stream.byte_offset() as u64;
+            match command? {
+                Command::Set { key: k, value: v } => {
+                    self.index.insert(
+                        k,
+                        CommandIndex {
+                            start: pos as usize,
+                            len: (new_pos - pos) as usize,
+                        },
+                    );
+                }
+                Command::Rm { key: k } => {
+                    self.index.remove(&k);
+                }
+                Command::Get { key: _key } => return Err(KvsError::Error),
+            };
+
+            pos = new_pos;
+        }
+        Ok(())
+    }
     fn write_to_log(&mut self, command: &Command) -> Result<()> {
         let file = OpenOptions::new().read(true).append(true).open(&self.log)?;
         let mut file = LineWriter::new(file);
@@ -135,12 +161,12 @@ impl KvStore {
     }
 
     pub fn get(&mut self, key: String) -> Result<Option<String>> {
-        let cmdpos = &self
-            .index
-            .get(&key)
-            .ok_or(KvsError::KeyNotFound(key.clone()))?;
+        let cmdpos = if let Some(a) = self.index.get(&key) {
+            a
+        } else {
+            return Ok(None);
+        };
         self.reader.seek(SeekFrom::Start(cmdpos.start as u64))?;
-        // let x = self.reader.take(cmdpos.len as u64);
 
         let command: Command =
             serde_json::from_reader(self.reader.get_ref().take(cmdpos.len as u64))?;
@@ -148,7 +174,7 @@ impl KvStore {
         if let Command::Set { key: _k, value: v } = command {
             Ok(Some(v))
         } else {
-            Err(KvsError::Error)
+            Ok(None)
         }
     }
 
