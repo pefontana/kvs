@@ -4,9 +4,8 @@ use clap::Parser;
 use kvs::{Cli, Command, KvStore, Result};
 
 fn main() -> Result<()> {
-    let mut kvs = KvStore::open(Path::new(""))?;
     let cli = Cli::parse();
-
+    let mut kvs = KvStore::open(Path::new(""))?;
     match &cli.command {
         Command::Get { key } => {
             let result = kvs.get(key.to_string())?;
@@ -18,9 +17,6 @@ fn main() -> Result<()> {
             Ok(())
         }
         Command::Set { key, value } => {
-            // println!("Command::Set");
-            // println!("key: {}", key);
-            // println!("value: {}", value);
             kvs.set(key.to_string(), value.to_string()).unwrap();
             Ok(())
         }
