@@ -48,10 +48,10 @@ impl<W: Write + Seek> Write for BufWriterWithPos<W> {
 
 impl<W: Write + Seek> BufWriterWithPos<W> {
     fn new(mut inner: W) -> Result<Self> {
-        let pos = inner.seek(SeekFrom::Current(0))?;
+        let pos = inner.seek(SeekFrom::Current(0))? as usize;
         Ok(BufWriterWithPos {
             writer: BufWriter::new(inner),
-            pos: pos as usize,
+            pos,
         })
     }
 }
@@ -85,18 +85,19 @@ impl KvStore {
         Ok(kvs)
     }
     pub fn load(&mut self) -> Result<()> {
-        let mut pos = self.reader.seek(SeekFrom::Start(0))?;
+        let mut pos = self.reader.seek(SeekFrom::Start(0))? as usize;
         let mut stream = Deserializer::from_reader(self.reader.get_ref()).into_iter::<Command>();
 
         while let Some(command) = stream.next() {
-            let new_pos = stream.byte_offset() as u64;
+            let new_pos = stream.byte_offset();
+            let len = new_pos - pos;
             match command? {
                 Command::Set { key: k, value: _v } => {
                     self.index.insert(
                         k,
                         CommandIndex {
-                            start: pos as usize,
-                            len: (new_pos - pos) as usize,
+                            start: pos,
+                            len: len,
                         },
                     );
                 }
@@ -106,6 +107,7 @@ impl KvStore {
                 Command::Get { key: _key } => return Err(KvsError::Error),
             };
 
+            self.buf_writer_with_pos.pos = pos + len;
             pos = new_pos;
         }
         Ok(())
@@ -122,13 +124,14 @@ impl KvStore {
         let start = self.buf_writer_with_pos.pos;
         let len = self.buf_writer_with_pos.write(command_json.as_bytes())?;
         self.index.insert(key, CommandIndex::new(start, len));
-        let _x = self.buf_writer_with_pos.write(b"\n")?;
         self.buf_writer_with_pos.flush()?;
-
         Ok(())
     }
 
     pub fn get(&mut self, key: String) -> Result<Option<String>> {
+        // let contents =
+        //     fs::read_to_string(&self._log).expect("Should have been able to read the file");
+        // println!("log: {:?}", contents);
         let cmdpos = if let Some(a) = self.index.get(&key) {
             a
         } else {
@@ -155,7 +158,6 @@ impl KvStore {
 
         let command_json = serde_json::to_string(&command)?;
         let _len = self.buf_writer_with_pos.write(command_json.as_bytes())?;
-        let _x = self.buf_writer_with_pos.write(b"\n")?;
         self.buf_writer_with_pos.flush()?;
 
         Ok(())
