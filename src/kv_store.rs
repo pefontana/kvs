@@ -17,6 +17,7 @@ pub struct KvStore {
     log: PathBuf,
     reader: BufReader<File>,
     buf_writer_with_pos: BufWriterWithPos<File>,
+    lock_log: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -80,6 +81,7 @@ impl KvStore {
             log,
             reader: BufReader::new(file),
             buf_writer_with_pos,
+            lock_log: false,
         };
 
         kvs.load()?;
@@ -163,6 +165,13 @@ impl KvStore {
     }
 
     pub fn compact(&mut self) -> Result<()> {
+        // Check if the log file is locked
+        if self.lock_log {
+            return Err(KvsError::InsufficientLogSize());
+        }
+
+        // Lock the log file
+        self.lock_log = true;
         // Remove old log file
         fs::remove_file(&self.log)?;
 
@@ -186,11 +195,14 @@ impl KvStore {
             let v = self
                 .get(key.to_string())?
                 .expect("Error in log compactation");
-            self.set(key.to_string(), v)?
+            self.set(key.to_string(), v)?;
         }
 
         // Assig new reader
         self.reader = BufReader::new(OpenOptions::new().read(true).open(&self.log)?);
+
+        // Unlock Log
+        self.lock_log = false;
 
         Ok(())
     }

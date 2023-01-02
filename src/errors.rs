@@ -12,6 +12,8 @@ pub enum KvsError {
     Serde(#[cause] serde_json::Error),
     #[fail(display = "{}, Key not found", 0)]
     KeyNotFound(String),
+    #[fail(display = "insufficient Log Size. Try to increase the LOG_MAX_SIZE")]
+    InsufficientLogSize(),
 }
 
 impl From<io::Error> for KvsError {
