@@ -60,3 +60,5 @@ in-memory index rebuilt.
 When the size of the uncompacted log entries reach a given threshold, `kvs`
 compacts it into a new log, removing redundent entries to reclaim disk space.
 
+## Links
+* https://github.com/pingcap/talent-plan/blob/master/courses/rust/projects/project-2/README.md
