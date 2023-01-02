@@ -4,20 +4,22 @@ use crate::commands::Command;
 use crate::errors::KvsError;
 use std::{
     collections::HashMap,
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
+
+const LOG_MAX_SIZE: usize = 1024 * 1024;
 pub type Result<T> = std::result::Result<T, KvsError>;
 
 pub struct KvStore {
     index: HashMap<String, CommandIndex>,
-    _log: PathBuf,
+    log: PathBuf,
     reader: BufReader<File>,
     buf_writer_with_pos: BufWriterWithPos<File>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct CommandIndex {
     start: usize,
     len: usize,
@@ -75,7 +77,7 @@ impl KvStore {
         )?;
         let mut kvs = KvStore {
             index: HashMap::new(),
-            _log: log,
+            log,
             reader: BufReader::new(file),
             buf_writer_with_pos,
         };
@@ -93,13 +95,7 @@ impl KvStore {
             let len = new_pos - pos;
             match command? {
                 Command::Set { key: k, value: _v } => {
-                    self.index.insert(
-                        k,
-                        CommandIndex {
-                            start: pos,
-                            len: len,
-                        },
-                    );
+                    self.index.insert(k, CommandIndex { start: pos, len });
                 }
                 Command::Rm { key: k } => {
                     self.index.remove(&k);
@@ -125,13 +121,15 @@ impl KvStore {
         let len = self.buf_writer_with_pos.write(command_json.as_bytes())?;
         self.index.insert(key, CommandIndex::new(start, len));
         self.buf_writer_with_pos.flush()?;
+
+        if self.buf_writer_with_pos.pos > LOG_MAX_SIZE {
+            self.compact()?
+        }
+
         Ok(())
     }
 
     pub fn get(&mut self, key: String) -> Result<Option<String>> {
-        // let contents =
-        //     fs::read_to_string(&self._log).expect("Should have been able to read the file");
-        // println!("log: {:?}", contents);
         let cmdpos = if let Some(a) = self.index.get(&key) {
             a
         } else {
@@ -151,6 +149,7 @@ impl KvStore {
 
     pub fn remove(&mut self, key: String) -> Result<()> {
         if self.index.remove(&key).is_none() {
+            println!("Key not found");
             return Err(KvsError::KeyNotFound(key));
         }
 
@@ -159,6 +158,39 @@ impl KvStore {
         let command_json = serde_json::to_string(&command)?;
         let _len = self.buf_writer_with_pos.write(command_json.as_bytes())?;
         self.buf_writer_with_pos.flush()?;
+
+        Ok(())
+    }
+
+    pub fn compact(&mut self) -> Result<()> {
+        // Remove old log file
+        fs::remove_file(&self.log)?;
+
+        // Create new empty log file
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(&self.log)?;
+
+        // Create new Writer
+        let buf_writer_with_pos = BufWriterWithPos::new(
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(&self.log)?,
+        )?;
+        self.buf_writer_with_pos = buf_writer_with_pos;
+
+        for key in self.index.clone().keys() {
+            let v = self
+                .get(key.to_string())?
+                .expect("Error in log compactation");
+            self.set(key.to_string(), v)?
+        }
+
+        // Assig new reader
+        self.reader = BufReader::new(OpenOptions::new().read(true).open(&self.log)?);
 
         Ok(())
     }
